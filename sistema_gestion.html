@@ -87,6 +87,26 @@ body{font-family:'Lato',sans-serif;background:#F4F0E8;min-height:100vh;}
 .stock-form{background:#fff;border:1px solid #E8DFC8;border-radius:12px;padding:12px;margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 .stock-form input{flex:1;min-width:120px;padding:8px 10px;border:1px solid #E8DFC8;border-radius:8px;font-size:13px;background:#FAF6ED;}
 .stock-form input:focus{outline:none;border-color:#BA7517;}
+
+.emp-card{background:#fff;border:1px solid #E8DFC8;border-radius:12px;padding:16px;text-align:center;}
+.emp-card.activo{border:2px solid var(--cana);background:#F6FBF0;}
+.emp-nombre{font-size:15px;font-weight:700;color:var(--cafe);margin-bottom:4px;}
+.emp-estado{font-size:11px;font-weight:700;letter-spacing:1px;padding:3px 10px;border-radius:20px;display:inline-block;margin-bottom:10px;}
+.emp-estado.trabajando{background:#EAF3DE;color:#3B6D11;}
+.emp-estado.libre{background:#F0E8D4;color:var(--texto-suave);}
+.emp-hora{font-size:20px;font-weight:700;color:var(--cafe);margin-bottom:12px;}
+.emp-sub{font-size:11px;color:var(--texto-suave);margin-bottom:12px;}
+.btn-entrada{width:100%;padding:10px;background:var(--cana);color:#EAF3DE;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:6px;}
+.btn-salida{width:100%;padding:10px;background:var(--rojo);color:#FCEBEB;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-deshabilitado{opacity:0.4;cursor:not-allowed;}
+.hist-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F0E8D4;font-size:13px;}
+.hist-row:last-child{border-bottom:none;}
+.hist-nombre{font-weight:700;color:var(--cafe);min-width:80px;}
+.hist-tipo{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;}
+.hist-entrada{background:#EAF3DE;color:#3B6D11;}
+.hist-salida{background:#FCEBEB;color:var(--rojo);}
+.hist-hora{color:var(--texto-suave);}
+
 .btn-add-stock{padding:8px 14px;background:var(--cafe);color:var(--miel-claro);border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
 </style>
 </head>
@@ -105,6 +125,7 @@ body{font-family:'Lato',sans-serif;background:#F4F0E8;min-height:100vh;}
   <button class="nav-tab active" id="tab-mesas" onclick="showVista('mesas')">🪑 Mesas</button>
   <button class="nav-tab" id="tab-resumen" onclick="showVista('resumen')">💰 Caja</button>
   <button class="nav-tab" id="tab-stock" onclick="showVista('stock')">📦 Stock</button>
+  <button class="nav-tab" id="tab-empleados" onclick="showVista('empleados')">👥 Turnos</button>
 </div>
 
 <div class="vista activa" id="v-mesas">
@@ -190,6 +211,15 @@ body{font-family:'Lato',sans-serif;background:#F4F0E8;min-height:100vh;}
   </div>
 </div>
 
+
+<div class="vista" id="v-empleados">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;" id="empleados-cards"></div>
+  <div class="panel">
+    <div class="panel-title">Historial de hoy</div>
+    <div id="empleados-historial"><p class="empty-msg">Sin registros hoy</p></div>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
@@ -224,12 +254,13 @@ setInterval(()=>{const d=new Date();document.getElementById('hora').textContent=
 document.getElementById('hora').textContent=new Date().toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'});
 
 function showVista(id){
-  ['mesas','pedido','ps','resumen','stock'].forEach(v=>document.getElementById('v-'+v).classList.remove('activa'));
-  ['mesas','resumen','stock'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.classList.remove('active');});
+  ['mesas','pedido','ps','resumen','stock','empleados'].forEach(v=>document.getElementById('v-'+v).classList.remove('activa'));
+  ['mesas','resumen','stock','empleados'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.classList.remove('active');});
   document.getElementById('v-'+id).classList.add('activa');
   const tab=document.getElementById('tab-'+id);if(tab)tab.classList.add('active');
   if(id==='resumen')escucharVentas();
   if(id==='stock')escucharStock();
+  if(id==='empleados'){escucharEmpleados();renderEmpleados();}
 }
 function volverMesas(){mesaActual=null;showVista('mesas');}
 
@@ -435,6 +466,97 @@ db.collection('playstation').doc('ps1').get().then(snap=>{
   if(!snap.exists)db.collection('playstation').doc('ps1').set({activa:false,segundos:0,pedido:{}});
   else{const d=snap.data();psData=d;if(d.activa&&d.segundos>0){psIntervalId=setInterval(tickPS,1000);}}
 }).catch(()=>setSyncErr());
+
+
+// EMPLEADOS
+const EMPLEADOS = [{id:'emp1', nombre:'Empleado 1'}, {id:'emp2', nombre:'Empleado 2'}];
+let empData = {'emp1':{activo:false,horaEntrada:null}, 'emp2':{activo:false,horaEntrada:null}};
+let empEscuchando = false;
+
+function escucharEmpleados(){
+  if(empEscuchando) return;
+  empEscuchando = true;
+  EMPLEADOS.forEach(emp => {
+    db.collection('empleados').doc(emp.id).onSnapshot(snap => {
+      if(snap.exists) empData[emp.id] = snap.data();
+      else empData[emp.id] = {activo:false, horaEntrada:null};
+      if(document.getElementById('v-empleados').classList.contains('activa')) renderEmpleados();
+      setSyncOk();
+    }, ()=>setSyncErr());
+  });
+  db.collection('turnos').orderBy('hora','desc').limit(20).onSnapshot(snap => {
+    const hist = document.getElementById('empleados-historial');
+    if(!hist) return;
+    const rows = snap.docs.map(d=>d.data());
+    hist.innerHTML = rows.length === 0 ? '<p class="empty-msg">Sin registros hoy</p>' :
+      rows.map(r => `<div class="hist-row">
+        <span class="hist-nombre">${r.nombre}</span>
+        <span class="hist-tipo ${r.tipo==='entrada'?'hist-entrada':'hist-salida'}">${r.tipo==='entrada'?'▶ Entrada':'■ Salida'}</span>
+        <span class="hist-hora">${r.hora}</span>
+        <span style="color:var(--cana);font-weight:700;font-size:12px;">${r.horas||''}</span>
+      </div>`).join('');
+    setSyncOk();
+  }, ()=>setSyncErr());
+}
+
+function renderEmpleados(){
+  const cont = document.getElementById('empleados-cards');
+  if(!cont) return;
+  cont.innerHTML = EMPLEADOS.map(emp => {
+    const d = empData[emp.id] || {activo:false};
+    const activo = d.activo || false;
+    let duracion = '';
+    if(activo && d.horaEntrada){
+      const inicio = new Date(d.horaEntrada);
+      const ahora = new Date();
+      const mins = Math.floor((ahora - inicio) / 60000);
+      const h = Math.floor(mins/60), m = mins%60;
+      duracion = h > 0 ? h+'h '+m+'min' : m+' min';
+    }
+    return `<div class="emp-card ${activo?'activo':''}">
+      <div class="emp-nombre">👤 ${emp.nombre}</div>
+      <div class="emp-estado ${activo?'trabajando':'libre'}">${activo?'Trabajando':'Libre'}</div>
+      <div class="emp-hora">${activo ? duracion||'--' : '--'}</div>
+      <div class="emp-sub">${activo && d.horaEntrada ? 'Entrada: '+new Date(d.horaEntrada).toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'}) : 'Sin turno activo'}</div>
+      ${!activo ? `<button class="btn-entrada" onclick="marcarEntrada('${emp.id}','${emp.nombre}')">▶ Marcar entrada</button>` : ''}
+      ${activo ? `<button class="btn-salida" onclick="marcarSalida('${emp.id}','${emp.nombre}')">■ Marcar salida</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function marcarEntrada(id, nombre){
+  if(!confirm('Marcar entrada de '+nombre+'?')) return;
+  const ahora = new Date();
+  const hora = ahora.toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'});
+  db.collection('empleados').doc(id).set({activo:true, horaEntrada:ahora.toISOString(), nombre});
+  db.collection('turnos').add({empId:id, nombre, tipo:'entrada', hora, fecha:ahora.toLocaleDateString('es-PY'), timestamp:ahora.toISOString()});
+  empData[id] = {activo:true, horaEntrada:ahora.toISOString()};
+  renderEmpleados();
+}
+
+function marcarSalida(id, nombre){
+  if(!confirm('Marcar salida de '+nombre+'?')) return;
+  const ahora = new Date();
+  const hora = ahora.toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'});
+  const d = empData[id];
+  let horas = '';
+  if(d && d.horaEntrada){
+    const inicio = new Date(d.horaEntrada);
+    const mins = Math.floor((ahora - inicio) / 60000);
+    const h = Math.floor(mins/60), m = mins%60;
+    horas = h > 0 ? h+'h '+m+'min' : m+' min';
+  }
+  db.collection('empleados').doc(id).set({activo:false, horaEntrada:null, nombre});
+  db.collection('turnos').add({empId:id, nombre, tipo:'salida', hora, horas, fecha:ahora.toLocaleDateString('es-PY'), timestamp:ahora.toISOString()});
+  empData[id] = {activo:false, horaEntrada:null};
+  renderEmpleados();
+}
+
+// Actualizar duración cada minuto
+setInterval(()=>{
+  if(document.getElementById('v-empleados').classList.contains('activa')) renderEmpleados();
+}, 60000);
+
 
 escucharMesas();
 </script>
