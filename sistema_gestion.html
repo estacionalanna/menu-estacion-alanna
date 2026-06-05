@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estación Alanna Café — Sistema</title>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+:root{--cafe:#3B2A1A;--miel:#EF9F27;--miel-claro:#FAC775;--miel-fondo:#FAEEDA;--cana:#3B6D11;--crema:#FAF6ED;--crema-oscuro:#F0E8D4;--texto:#2C1F0F;--texto-suave:#7A6050;--rojo:#A32D2D;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Lato',sans-serif;background:#F4F0E8;min-height:100vh;}
+.topbar{background:var(--cafe);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;}
+.topbar-left{display:flex;align-items:center;gap:10px;}
+.topbar-logo{width:36px;height:36px;border-radius:50%;object-fit:cover;border:1.5px solid var(--miel);}
+.topbar-title{font-size:14px;font-weight:700;color:var(--miel-claro);letter-spacing:1px;}
+.topbar-hora{font-size:12px;color:#BA7517;}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;}
+.sync-dot.ok{background:#3B6D11;}.sync-dot.err{background:var(--rojo);}
+.nav-tabs{display:flex;background:#2C1F0F;}
+.nav-tab{flex:1;padding:11px 6px;background:none;border:none;cursor:pointer;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#BA7517;border-bottom:3px solid transparent;}
+.nav-tab.active{color:var(--miel-claro);border-bottom:3px solid var(--miel);}
+.vista{display:none;padding:14px;max-width:700px;margin:0 auto;}
+.vista.activa{display:block;}
+.grid-mesas{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.mesa-card{background:#fff;border:1px solid #E8DFC8;border-radius:12px;padding:14px;cursor:pointer;transition:border-color 0.15s;}
+.mesa-card.ocupada{border:2px solid var(--miel);background:#FFFDF7;}
+.mesa-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.mesa-nombre{font-size:14px;font-weight:700;color:var(--cafe);}
+.badge{font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 8px;border-radius:20px;}
+.badge-libre{background:#EAF3DE;color:#3B6D11;}.badge-ocu{background:var(--miel-fondo);color:#854F0B;}
+.badge-ps{background:#EAF3DE;color:#3B6D11;}.badge-ps-ocu{background:#FCEBEB;color:var(--rojo);}
+.mesa-total{font-size:22px;font-weight:700;color:var(--cafe);}
+.mesa-sub{font-size:11px;color:var(--texto-suave);margin-top:2px;}
+.ps-card{background:#fff;border:1px solid #E8DFC8;border-radius:12px;padding:14px;cursor:pointer;}
+.ps-card.activa{border:2px solid var(--cana);background:#F6FBF0;}
+.back-bar{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.btn-back{background:none;border:1px solid #E8DFC8;border-radius:8px;padding:7px 12px;cursor:pointer;font-size:13px;color:var(--texto-suave);}
+.vista-title{font-size:16px;font-weight:700;color:var(--cafe);}
+.dos-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+@media(max-width:500px){.dos-cols{grid-template-columns:1fr;}}
+.panel{background:#fff;border:1px solid #E8DFC8;border-radius:12px;padding:12px;}
+.panel-title{font-size:10px;font-weight:700;letter-spacing:2px;color:#BA7517;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #F0E8D4;text-transform:uppercase;}
+.cat-lbl{font-size:10px;color:var(--texto-suave);letter-spacing:1px;margin:8px 0 4px;font-weight:700;text-transform:uppercase;}
+.prod-btn{width:100%;text-align:left;background:#FAF6ED;border:1px solid #E8DFC8;border-radius:8px;padding:8px 10px;cursor:pointer;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;}
+.prod-btn:hover{border-color:#BA7517;}
+.prod-nombre{font-size:13px;color:var(--cafe);}
+.prod-precio{font-size:12px;color:var(--cana);font-weight:700;}
+.t-item{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid #F0E8D4;font-size:13px;}
+.t-item:last-child{border-bottom:none;}
+.t-name{flex:1;color:var(--cafe);}
+.qty-ctrl{display:flex;align-items:center;gap:4px;}
+.qty-btn{width:22px;height:22px;border-radius:50%;border:1px solid #E8DFC8;background:#FAF6ED;cursor:pointer;font-size:14px;color:var(--cafe);display:flex;align-items:center;justify-content:center;}
+.t-sub{min-width:55px;text-align:right;color:var(--cana);font-weight:700;}
+.total-bar{display:flex;justify-content:space-between;align-items:center;background:var(--miel-fondo);border-radius:8px;padding:10px 12px;margin-top:10px;}
+.total-lbl{font-size:13px;font-weight:700;color:#854F0B;}
+.total-amt{font-size:22px;font-weight:700;color:var(--cafe);}
+.btn-cobrar{width:100%;padding:12px;background:var(--cafe);color:var(--miel-claro);border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;}
+.empty-msg{text-align:center;color:var(--texto-suave);font-size:13px;padding:18px 0;}
+.ps-panel{background:#fff;border:1px solid #E8DFC8;border-radius:12px;padding:20px;text-align:center;margin-bottom:10px;}
+.ps-big{font-size:54px;font-weight:700;letter-spacing:3px;margin:10px 0;color:var(--cana);}
+.ps-big.alerta{color:var(--rojo);}
+.tiempo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0;}
+.t-opt{padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #E8DFC8;background:#FAF6ED;color:var(--cafe);text-align:center;}
+.t-opt.sel{border:2px solid var(--miel);background:var(--miel-fondo);color:#854F0B;}
+.ps-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+.ps-btn{padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;}
+.ps-start{background:var(--cana);color:#EAF3DE;}
+.ps-stop{background:var(--rojo);color:#FCEBEB;}
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.metric{background:#fff;border:1px solid #E8DFC8;border-radius:12px;padding:14px;text-align:center;}
+.metric-lbl{font-size:11px;color:var(--texto-suave);margin-bottom:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
+.metric-val{font-size:24px;font-weight:700;color:var(--cafe);}
+.venta-row{display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid #F0E8D4;font-size:13px;}
+.venta-row:last-child{border-bottom:none;}
+.venta-hora{color:var(--texto-suave);min-width:45px;}
+.venta-det{flex:1;margin:0 8px;color:var(--cafe);font-size:12px;}
+.venta-amt{color:var(--cana);font-weight:700;}
+.btn-cerrar{width:100%;padding:11px;background:none;color:var(--rojo);border:1px solid #F7C1C1;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;}
+.stock-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border:1px solid #E8DFC8;border-radius:10px;margin-bottom:6px;}
+.stock-nombre{flex:1;font-size:13px;color:var(--cafe);}
+.stock-qty{font-size:16px;font-weight:700;color:var(--cafe);min-width:32px;text-align:center;}
+.stock-qty.bajo{color:var(--rojo);}
+.stock-ctrl{display:flex;align-items:center;gap:6px;}
+.stock-btn{width:28px;height:28px;border-radius:50%;border:1px solid #E8DFC8;background:#FAF6ED;cursor:pointer;font-size:16px;color:var(--cafe);display:flex;align-items:center;justify-content:center;}
+.badge-stock-ok{background:#EAF3DE;color:#3B6D11;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700;}
+.badge-stock-bajo{background:#FCEBEB;color:var(--rojo);font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700;}
+.stock-form{background:#fff;border:1px solid #E8DFC8;border-radius:12px;padding:12px;margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.stock-form input{flex:1;min-width:120px;padding:8px 10px;border:1px solid #E8DFC8;border-radius:8px;font-size:13px;background:#FAF6ED;}
+.stock-form input:focus{outline:none;border-color:#BA7517;}
+.btn-add-stock{padding:8px 14px;background:var(--cafe);color:var(--miel-claro);border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <img class="topbar-logo" src="logo.png" alt="Logo" onerror="this.style.display='none'">
+    <span class="topbar-title">Estación Alanna</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span class="topbar-hora" id="hora"></span>
+    <span class="sync-dot" id="sync-dot"></span>
+  </div>
+</div>
+<div class="nav-tabs">
+  <button class="nav-tab active" id="tab-mesas" onclick="showVista('mesas')">🪑 Mesas</button>
+  <button class="nav-tab" id="tab-resumen" onclick="showVista('resumen')">💰 Caja</button>
+  <button class="nav-tab" id="tab-stock" onclick="showVista('stock')">📦 Stock</button>
+</div>
+
+<div class="vista activa" id="v-mesas">
+  <div class="grid-mesas" id="grid-mesas"></div>
+  <div class="ps-card" id="ps-card" onclick="abrirPS()">
+    <div class="mesa-top">
+      <span class="mesa-nombre">🎮 PlayStation 1</span>
+      <span class="badge badge-ps" id="ps-badge-main">libre</span>
+    </div>
+    <div class="mesa-total" id="ps-timer-mini" style="color:var(--cana);">--:--</div>
+    <div class="mesa-sub" id="ps-sub-mini">Tocá para gestionar</div>
+  </div>
+</div>
+
+<div class="vista" id="v-pedido">
+  <div class="back-bar">
+    <button class="btn-back" onclick="volverMesas()">← Volver</button>
+    <span class="vista-title" id="pedido-title">Mesa 1</span>
+  </div>
+  <div class="dos-cols">
+    <div class="panel"><div class="panel-title">Menú</div><div id="menu-lista"></div></div>
+    <div class="panel">
+      <div class="panel-title">Pedido</div>
+      <div id="ticket-lista"><p class="empty-msg">Sin productos</p></div>
+      <div class="total-bar"><span class="total-lbl">Total</span><span class="total-amt" id="ticket-total">₲ 0</span></div>
+      <button class="btn-cobrar" onclick="cobrarMesa()">✓ Cobrar y liberar mesa</button>
+    </div>
+  </div>
+</div>
+
+<div class="vista" id="v-ps">
+  <div class="back-bar">
+    <button class="btn-back" onclick="volverMesas()">← Volver</button>
+    <span class="vista-title">PlayStation 1</span>
+  </div>
+  <div class="ps-panel">
+    <div style="font-size:12px;color:var(--texto-suave);">Tiempo restante</div>
+    <div class="ps-big" id="ps-big-timer">--:--</div>
+    <div style="font-size:12px;color:var(--texto-suave);margin-bottom:4px;">Seleccioná el tiempo:</div>
+    <div class="tiempo-grid">
+      <div class="t-opt sel" onclick="selT(this,30)">30 min</div>
+      <div class="t-opt" onclick="selT(this,60)">1 hora</div>
+      <div class="t-opt" onclick="selT(this,90)">1h 30m</div>
+      <div class="t-opt" onclick="selT(this,120)">2 horas</div>
+      <div class="t-opt" onclick="selT(this,180)">3 horas</div>
+      <div class="t-opt" onclick="selT(this,0)">Libre</div>
+    </div>
+    <div class="ps-btns">
+      <button class="ps-btn ps-start" onclick="iniciarPS()">▶ Iniciar</button>
+      <button class="ps-btn ps-stop" onclick="detenerPS()">■ Detener</button>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-title">Consumo PS</div>
+    <div id="ps-menu-lista"></div>
+    <div id="ps-ticket-lista"><p class="empty-msg">Sin consumo</p></div>
+    <div class="total-bar" style="margin-top:8px;"><span class="total-lbl">Total PS</span><span class="total-amt" id="ps-total">₲ 0</span></div>
+    <button class="btn-cobrar" onclick="cobrarPS()">✓ Cobrar y liberar</button>
+  </div>
+</div>
+
+<div class="vista" id="v-resumen">
+  <div class="metric-grid">
+    <div class="metric"><div class="metric-lbl">Total del día</div><div class="metric-val" id="total-dia">₲ 0</div></div>
+    <div class="metric"><div class="metric-lbl">Ventas</div><div class="metric-val" id="cant-ventas">0</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-title">Historial de hoy</div>
+    <div id="historial-lista"><p class="empty-msg">Sin ventas aún</p></div>
+  </div>
+  <button class="btn-cerrar" onclick="cerrarCaja()">🔒 Cerrar caja del día</button>
+</div>
+
+<div class="vista" id="v-stock">
+  <div class="stock-form">
+    <input type="text" id="stock-nombre-input" placeholder="Nombre del producto" />
+    <input type="number" id="stock-qty-input" placeholder="Cantidad" min="0" style="max-width:90px;" />
+    <button class="btn-add-stock" onclick="agregarStock()">+ Agregar</button>
+  </div>
+  <div class="panel">
+    <div class="panel-title">Inventario actual</div>
+    <div id="stock-lista"><p class="empty-msg">Cargando...</p></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyCZTl6wV52InsU-9i24BVy1Qo97_MVlnk8",
+  authDomain:"estacion-alanna.firebaseapp.com",
+  projectId:"estacion-alanna",
+  storageBucket:"estacion-alanna.firebasestorage.app",
+  messagingSenderId:"776786709550",
+  appId:"1:776786709550:web:b5b77a46abdbfb363423bf"
+});
+const db = firebase.firestore();
+
+const MENU = [
+  {cat:'Cafés puros',items:[{n:'Expreso',p:6000},{n:'Americano',p:6000}]},
+  {cat:'Cafés suaves',items:[{n:'Café cortado',p:7000},{n:'Café con leche',p:7000}]},
+  {cat:'Especiales',items:[{n:'Capuchino',p:9000},{n:'Mocaccino',p:9000},{n:'Estación Arroyos ★',p:10000}]},
+  {cat:'Cocidos',items:[{n:'Cocido negro',p:6000},{n:'Cocido con leche',p:7000},{n:"Cocido maní ku'i",p:8000},{n:'Estación Esteros ★',p:10000}]},
+  {cat:'Helados — cucurucho',items:[{n:'Helado 1 bocha',p:3000},{n:'Helado 2 bochas',p:5000}]},
+  {cat:'Helados — vaso',items:[{n:'Helado vaso ¼ kg',p:10000},{n:'Helado por kilo',p:30000}]},
+  {cat:'Paletas y otros',items:[{n:'Chupachus',p:1000},{n:'Paleta frutal',p:2000},{n:'Paleta cremosa',p:3000}]},
+];
+
+function fGs(n){return '₲ '+Math.round(n).toLocaleString('es-PY');}
+function findProd(nombre){for(const c of MENU)for(const it of c.items)if(it.n===nombre)return it;return null;}
+function calcTotal(pedido){return Object.entries(pedido||{}).reduce((s,[k,q])=>{const p=findProd(k);return s+(p?p.p*q:0);},0);}
+function setSyncOk(){document.getElementById('sync-dot').className='sync-dot ok';}
+function setSyncErr(){document.getElementById('sync-dot').className='sync-dot err';}
+
+setInterval(()=>{const d=new Date();document.getElementById('hora').textContent=d.toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'});},1000);
+document.getElementById('hora').textContent=new Date().toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'});
+
+function showVista(id){
+  ['mesas','pedido','ps','resumen','stock'].forEach(v=>document.getElementById('v-'+v).classList.remove('activa'));
+  ['mesas','resumen','stock'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.classList.remove('active');});
+  document.getElementById('v-'+id).classList.add('activa');
+  const tab=document.getElementById('tab-'+id);if(tab)tab.classList.add('active');
+  if(id==='resumen')escucharVentas();
+  if(id==='stock')escucharStock();
+}
+function volverMesas(){mesaActual=null;showVista('mesas');}
+
+let mesaActual=null;
+let mesasData={1:{pedido:{}},2:{pedido:{}},3:{pedido:{}},4:{pedido:{}}};
+let psData={activa:false,segundos:0,pedido:{}};
+let psIntervalId=null;
+let psTiempoSel=30;
+
+function escucharMesas(){
+  for(let i=1;i<=4;i++){
+    db.collection('mesas').doc('mesa'+i).onSnapshot(snap=>{
+      mesasData[i]=snap.exists?snap.data():{pedido:{}};
+      renderMesas();setSyncOk();
+      if(mesaActual===i)renderTicketMesa();
+    },()=>setSyncErr());
+  }
+  db.collection('playstation').doc('ps1').onSnapshot(snap=>{
+    if(snap.exists){
+      const d=snap.data();psData.pedido=d.pedido||{};
+      if(d.activa&&!psData.activa){psData.activa=true;psData.segundos=d.segundos||0;if(!psIntervalId)psIntervalId=setInterval(tickPS,1000);}
+      if(!d.activa&&psData.activa){psData.activa=false;psData.segundos=0;if(psIntervalId){clearInterval(psIntervalId);psIntervalId=null;}}
+    }
+    renderMesas();
+    if(document.getElementById('v-ps').classList.contains('activa')){renderTicketPS();actualizarBigTimer();}
+    setSyncOk();
+  },()=>setSyncErr());
+}
+
+function renderMesas(){
+  document.getElementById('grid-mesas').innerHTML=[1,2,3,4].map(i=>{
+    const d=mesasData[i]||{pedido:{}};const total=calcTotal(d.pedido);
+    const items=Object.values(d.pedido||{}).reduce((a,b)=>a+b,0);const ocu=items>0;
+    return `<div class="mesa-card ${ocu?'ocupada':''}" onclick="abrirMesa(${i})">
+      <div class="mesa-top"><span class="mesa-nombre">🪑 Mesa ${i}</span>
+      <span class="badge ${ocu?'badge-ocu':'badge-libre'}">${ocu?'ocupada':'libre'}</span></div>
+      <div class="mesa-total">${ocu?fGs(total):'—'}</div>
+      <div class="mesa-sub">${ocu?items+' producto(s)':'Libre para atender'}</div></div>`;
+  }).join('');
+  const psOcu=psData.activa||Object.keys(psData.pedido||{}).length>0;
+  document.getElementById('ps-card').className='ps-card'+(psOcu?' activa':'');
+  document.getElementById('ps-badge-main').className='badge '+(psOcu?'badge-ps-ocu':'badge-ps');
+  document.getElementById('ps-badge-main').textContent=psOcu?'ocupada':'libre';
+  document.getElementById('ps-timer-mini').textContent=psData.activa?formatT(psData.segundos):'--:--';
+  document.getElementById('ps-sub-mini').textContent=psOcu?'En uso — tocá para ver':'Tocá para gestionar';
+}
+
+function abrirMesa(id){
+  mesaActual=id;document.getElementById('pedido-title').textContent='Mesa '+id;
+  showVista('pedido');renderMenuLista('menu-lista',false);renderTicketMesa();
+}
+
+function renderMenuLista(containerId,esPS){
+  document.getElementById(containerId).innerHTML=MENU.map(c=>`
+    <div class="cat-lbl">${c.cat}</div>
+    ${c.items.map(it=>`<button class="prod-btn" onclick="${esPS?'agregarPS':'agregarMesa'}('${it.n}')">
+      <span class="prod-nombre">${it.n}</span><span class="prod-precio">${fGs(it.p)}</span>
+    </button>`).join('')}`).join('');
+}
+
+function renderTicketMesa(){renderTicketGenerico('ticket-lista','ticket-total',mesasData[mesaActual]&&mesasData[mesaActual].pedido||{},'cambiarMesa');}
+
+function renderTicketGenerico(listaId,totalId,pedido,fnCambiar){
+  const lista=document.getElementById(listaId);
+  const items=Object.entries(pedido||{}).filter(([,q])=>q>0);
+  lista.innerHTML=items.length===0?'<p class="empty-msg">Sin productos</p>':
+    items.map(([n,q])=>{const pr=findProd(n);const price=pr?pr.p:0;
+      return `<div class="t-item"><span class="t-name">${n}</span>
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="${fnCambiar}('${n}',-1)">-</button>
+          <span style="font-size:13px;min-width:16px;text-align:center;">${q}</span>
+          <button class="qty-btn" onclick="${fnCambiar}('${n}',1)">+</button>
+        </div><span class="t-sub">${fGs(price*q)}</span></div>`;}).join('');
+  document.getElementById(totalId).textContent=fGs(calcTotal(pedido));
+}
+
+function agregarMesa(nombre){
+  const pedido=Object.assign({},mesasData[mesaActual]&&mesasData[mesaActual].pedido||{});
+  pedido[nombre]=(pedido[nombre]||0)+1;mesasData[mesaActual]={pedido};
+  db.collection('mesas').doc('mesa'+mesaActual).set({pedido}).catch(()=>setSyncErr());
+  renderTicketMesa();
+}
+function cambiarMesa(nombre,delta){
+  const pedido=Object.assign({},mesasData[mesaActual]&&mesasData[mesaActual].pedido||{});
+  pedido[nombre]=(pedido[nombre]||0)+delta;if(pedido[nombre]<=0)delete pedido[nombre];
+  mesasData[mesaActual]={pedido};
+  db.collection('mesas').doc('mesa'+mesaActual).set({pedido}).catch(()=>setSyncErr());renderTicketMesa();
+}
+function cobrarMesa(){
+  const d=mesasData[mesaActual]||{pedido:{}};const total=calcTotal(d.pedido);
+  const items=Object.values(d.pedido||{}).reduce((a,b)=>a+b,0);
+  if(items===0){volverMesas();return;}
+  if(!confirm('Cobrar '+fGs(total)+' de Mesa '+mesaActual+'?'))return;
+  const hora=new Date().toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'});
+  const detalle=Object.entries(d.pedido).map(([n,q])=>n+(q>1?' x'+q:'')).join(', ');
+  db.collection('ventas').add({hora,detalle,total,mesa:'Mesa '+mesaActual,fecha:new Date().toLocaleDateString('es-PY')});
+  db.collection('mesas').doc('mesa'+mesaActual).set({pedido:{}});
+  mesasData[mesaActual]={pedido:{}};volverMesas();
+}
+
+function abrirPS(){showVista('ps');renderMenuLista('ps-menu-lista',true);renderTicketPS();actualizarBigTimer();}
+function renderTicketPS(){renderTicketGenerico('ps-ticket-lista','ps-total',psData.pedido||{},'cambiarPS');}
+function selT(el,mins){document.querySelectorAll('.t-opt').forEach(e=>e.classList.remove('sel'));el.classList.add('sel');psTiempoSel=mins;}
+function iniciarPS(){
+  if(psIntervalId)clearInterval(psIntervalId);
+  psData.segundos=psTiempoSel*60;psData.activa=true;
+  db.collection('playstation').doc('ps1').set({activa:true,segundos:psData.segundos,pedido:psData.pedido||{}});
+  psIntervalId=setInterval(tickPS,1000);actualizarBigTimer();
+}
+function tickPS(){
+  if(psData.segundos>0){
+    psData.segundos--;actualizarBigTimer();
+    document.getElementById('ps-timer-mini').textContent=formatT(psData.segundos);
+    if(psData.segundos%15===0)db.collection('playstation').doc('ps1').update({segundos:psData.segundos}).catch(()=>{});
+    if(psData.segundos===0){clearInterval(psIntervalId);psIntervalId=null;psData.activa=false;
+      db.collection('playstation').doc('ps1').update({activa:false,segundos:0}).catch(()=>{});
+      alert('¡Tiempo de PlayStation terminado!');renderMesas();}
+  }
+}
+function detenerPS(){
+  if(psIntervalId){clearInterval(psIntervalId);psIntervalId=null;}
+  psData.activa=false;psData.segundos=0;
+  db.collection('playstation').doc('ps1').update({activa:false,segundos:0}).catch(()=>{});
+  actualizarBigTimer();document.getElementById('ps-timer-mini').textContent='--:--';renderMesas();
+}
+function actualizarBigTimer(){
+  const el=document.getElementById('ps-big-timer');if(el){
+    el.textContent=psData.activa||psData.segundos>0?formatT(psData.segundos):'--:--';
+    el.className='ps-big'+(psData.segundos<300&&psData.segundos>0?' alerta':'');}
+}
+function agregarPS(nombre){
+  const pedido=Object.assign({},psData.pedido||{});pedido[nombre]=(pedido[nombre]||0)+1;psData.pedido=pedido;
+  db.collection('playstation').doc('ps1').update({pedido}).catch(()=>{});renderTicketPS();
+}
+function cambiarPS(nombre,delta){
+  const pedido=Object.assign({},psData.pedido||{});pedido[nombre]=(pedido[nombre]||0)+delta;
+  if(pedido[nombre]<=0)delete pedido[nombre];psData.pedido=pedido;
+  db.collection('playstation').doc('ps1').update({pedido}).catch(()=>{});renderTicketPS();
+}
+function cobrarPS(){
+  const total=calcTotal(psData.pedido||{});
+  const items=Object.values(psData.pedido||{}).reduce((a,b)=>a+b,0);
+  if(!confirm('Cobrar PlayStation: '+fGs(total)+'?'))return;
+  if(items>0){
+    const hora=new Date().toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'});
+    const detalle=Object.entries(psData.pedido).map(([n,q])=>n+(q>1?' x'+q:'')).join(', ');
+    db.collection('ventas').add({hora,detalle,total,mesa:'PlayStation',fecha:new Date().toLocaleDateString('es-PY')});
+  }
+  detenerPS();psData.pedido={};
+  db.collection('playstation').doc('ps1').set({activa:false,segundos:0,pedido:{}});volverMesas();
+}
+function formatT(s){const m=Math.floor(s/60),sec=s%60;return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');}
+
+function escucharVentas(){
+  db.collection('ventas').orderBy('hora','desc').onSnapshot(snap=>{
+    const ventas=snap.docs.map(d=>d.data());
+    const total=ventas.reduce((s,v)=>s+(v.total||0),0);
+    document.getElementById('total-dia').textContent=fGs(total);
+    document.getElementById('cant-ventas').textContent=ventas.length;
+    const el=document.getElementById('historial-lista');
+    el.innerHTML=ventas.length===0?'<p class="empty-msg">Sin ventas aún</p>':
+      ventas.map(v=>`<div class="venta-row"><span class="venta-hora">${v.hora}</span>
+        <span class="venta-det">${v.mesa} — ${v.detalle}</span>
+        <span class="venta-amt">${fGs(v.total)}</span></div>`).join('');
+    setSyncOk();},()=>setSyncErr());
+}
+function cerrarCaja(){
+  if(!confirm('¿Cerrar caja del día?'))return;
+  db.collection('ventas').get().then(snap=>{const batch=db.batch();snap.docs.forEach(d=>batch.delete(d.ref));return batch.commit();}).then(()=>setSyncOk()).catch(()=>setSyncErr());
+}
+
+let stockEscuchando=false;
+function escucharStock(){
+  if(stockEscuchando)return;stockEscuchando=true;
+  db.collection('stock').orderBy('nombre').onSnapshot(snap=>{
+    const items=snap.docs.map(d=>({id:d.id,...d.data()}));
+    const el=document.getElementById('stock-lista');
+    el.innerHTML=items.length===0?'<p class="empty-msg">Sin productos. Agregá uno arriba.</p>':
+      items.map(it=>`<div class="stock-item">
+        <span class="stock-nombre">${it.nombre}</span>
+        <div class="stock-ctrl">
+          <button class="stock-btn" onclick="cambiarStock('${it.id}',-1)">-</button>
+          <span class="stock-qty ${it.cantidad<=3?'bajo':''}">${it.cantidad}</span>
+          <button class="stock-btn" onclick="cambiarStock('${it.id}',1)">+</button>
+        </div>
+        <span class="${it.cantidad<=3?'badge-stock-bajo':'badge-stock-ok'}">${it.cantidad<=3?'⚠ bajo':'✓ ok'}</span>
+      </div>`).join('');setSyncOk();},()=>setSyncErr());
+}
+function agregarStock(){
+  const nombre=document.getElementById('stock-nombre-input').value.trim();
+  const qty=parseInt(document.getElementById('stock-qty-input').value)||0;
+  if(!nombre){alert('Escribí el nombre del producto.');return;}
+  db.collection('stock').add({nombre,cantidad:qty}).then(()=>{
+    document.getElementById('stock-nombre-input').value='';
+    document.getElementById('stock-qty-input').value='';setSyncOk();}).catch(()=>setSyncErr());
+}
+function cambiarStock(id,delta){
+  const ref=db.collection('stock').doc(id);
+  ref.get().then(snap=>{if(!snap.exists)return;const nueva=Math.max(0,(snap.data().cantidad||0)+delta);ref.update({cantidad:nueva});});
+}
+
+db.collection('playstation').doc('ps1').get().then(snap=>{
+  if(!snap.exists)db.collection('playstation').doc('ps1').set({activa:false,segundos:0,pedido:{}});
+  else{const d=snap.data();psData=d;if(d.activa&&d.segundos>0){psIntervalId=setInterval(tickPS,1000);}}
+}).catch(()=>setSyncErr());
+
+escucharMesas();
+</script>
+</body>
+</html>
