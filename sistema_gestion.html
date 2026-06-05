@@ -88,6 +88,20 @@ body{font-family:'Lato',sans-serif;background:#F4F0E8;min-height:100vh;}
 .stock-form input{flex:1;min-width:120px;padding:8px 10px;border:1px solid #E8DFC8;border-radius:8px;font-size:13px;background:#FAF6ED;}
 .stock-form input:focus{outline:none;border-color:#BA7517;}
 
+
+.cli-card{background:#fff;border:1px solid #E8DFC8;border-radius:10px;padding:12px 14px;margin-bottom:8px;}
+.cli-card.cumple-hoy{border:2px solid #EF9F27;background:#FFFDF7;}
+.cli-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
+.cli-nombre{font-size:14px;font-weight:700;color:#3B2A1A;}
+.cli-badge-cumple{font-size:10px;font-weight:700;background:#FAEEDA;color:#854F0B;border-radius:20px;padding:2px 8px;}
+.cli-badge-pronto{font-size:10px;font-weight:700;background:#EAF3DE;color:#3B6D11;border-radius:20px;padding:2px 8px;}
+.cli-info{font-size:12px;color:#7A6050;line-height:1.7;}
+.cli-info span{margin-right:8px;}
+.cli-consume{font-size:12px;color:#3B6D11;font-style:italic;margin-top:4px;}
+.cli-actions{display:flex;gap:6px;margin-top:8px;}
+.btn-wsp{padding:6px 12px;background:#25D366;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block;}
+.btn-eliminar{padding:6px 10px;background:none;color:#A32D2D;border:1px solid #F7C1C1;border-radius:8px;font-size:12px;cursor:pointer;}
+
 .emp-card{background:#fff;border:1px solid #E8DFC8;border-radius:12px;padding:16px;text-align:center;}
 .emp-card.activo{border:2px solid var(--cana);background:#F6FBF0;}
 .emp-nombre{font-size:15px;font-weight:700;color:var(--cafe);margin-bottom:4px;}
@@ -126,6 +140,7 @@ body{font-family:'Lato',sans-serif;background:#F4F0E8;min-height:100vh;}
   <button class="nav-tab" id="tab-resumen" onclick="showVista('resumen')">💰 Caja</button>
   <button class="nav-tab" id="tab-stock" onclick="showVista('stock')">📦 Stock</button>
   <button class="nav-tab" id="tab-empleados" onclick="showVista('empleados')">👥 Turnos</button>
+  <button class="nav-tab" id="tab-cumple" onclick="showVista('cumple')">🎂 Clientes</button>
 </div>
 
 <div class="vista activa" id="v-mesas">
@@ -220,6 +235,39 @@ body{font-family:'Lato',sans-serif;background:#F4F0E8;min-height:100vh;}
   </div>
 </div>
 
+
+<div class="vista" id="v-cumple">
+
+  <!-- Alerta cumpleaños hoy -->
+  <div id="cumple-alerta-hoy" style="display:none;background:#FAEEDA;border:2px solid #EF9F27;border-radius:12px;padding:14px;margin-bottom:12px;text-align:center;">
+    <div style="font-size:20px;margin-bottom:4px;">🎂</div>
+    <div style="font-size:14px;font-weight:700;color:#854F0B;margin-bottom:4px;">¡Cumpleaños hoy!</div>
+    <div id="cumple-alerta-nombres" style="font-size:13px;color:#3B2A1A;line-height:1.7;"></div>
+  </div>
+
+  <!-- Formulario agregar cliente -->
+  <div class="panel" style="margin-bottom:10px;">
+    <div class="panel-title">Agregar cliente</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+      <input type="text" id="cli-nombre" placeholder="Nombre completo" style="padding:9px 12px;border:1px solid #E8DFC8;border-radius:8px;font-size:13px;background:#FAF6ED;font-family:'Lato',sans-serif;">
+      <input type="date" id="cli-fecha" style="padding:9px 12px;border:1px solid #E8DFC8;border-radius:8px;font-size:13px;background:#FAF6ED;font-family:'Lato',sans-serif;">
+      <input type="tel" id="cli-tel" placeholder="Teléfono (ej: 0981 123456)" style="padding:9px 12px;border:1px solid #E8DFC8;border-radius:8px;font-size:13px;background:#FAF6ED;font-family:'Lato',sans-serif;">
+      <input type="text" id="cli-consume" placeholder="¿Qué consume habitualmente?" style="padding:9px 12px;border:1px solid #E8DFC8;border-radius:8px;font-size:13px;background:#FAF6ED;font-family:'Lato',sans-serif;">
+      <button onclick="agregarCliente()" style="padding:11px;background:#3B2A1A;color:#FAC775;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">+ Agregar cliente</button>
+    </div>
+  </div>
+
+  <!-- Lista clientes -->
+  <div class="panel">
+    <div class="panel-title">Clientes registrados</div>
+    <div style="margin:8px 0 10px;">
+      <input type="text" id="cli-buscar" placeholder="🔍 Buscar cliente..." oninput="filtrarClientes()" style="width:100%;padding:8px 12px;border:1px solid #E8DFC8;border-radius:8px;font-size:13px;background:#FAF6ED;font-family:'Lato',sans-serif;">
+    </div>
+    <div id="clientes-lista"><p class="empty-msg">Sin clientes registrados aún</p></div>
+  </div>
+
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
@@ -254,13 +302,14 @@ setInterval(()=>{const d=new Date();document.getElementById('hora').textContent=
 document.getElementById('hora').textContent=new Date().toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'});
 
 function showVista(id){
-  ['mesas','pedido','ps','resumen','stock','empleados'].forEach(v=>document.getElementById('v-'+v).classList.remove('activa'));
-  ['mesas','resumen','stock','empleados'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.classList.remove('active');});
+  ['mesas','pedido','ps','resumen','stock','empleados','cumple'].forEach(v=>document.getElementById('v-'+v).classList.remove('activa'));
+  ['mesas','resumen','stock','empleados','cumple'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.classList.remove('active');});
   document.getElementById('v-'+id).classList.add('activa');
   const tab=document.getElementById('tab-'+id);if(tab)tab.classList.add('active');
   if(id==='resumen')escucharVentas();
   if(id==='stock')escucharStock();
   if(id==='empleados'){escucharEmpleados();renderEmpleados();}
+  if(id==='cumple'){escucharClientes();}
 }
 function volverMesas(){mesaActual=null;showVista('mesas');}
 
@@ -467,6 +516,118 @@ db.collection('playstation').doc('ps1').get().then(snap=>{
   else{const d=snap.data();psData=d;if(d.activa&&d.segundos>0){psIntervalId=setInterval(tickPS,1000);}}
 }).catch(()=>setSyncErr());
 
+
+
+// CLIENTES Y CUMPLEAÑOS
+let todosClientes = [];
+let cumpleEscuchando = false;
+
+function escucharClientes(){
+  if(cumpleEscuchando) return;
+  cumpleEscuchando = true;
+  db.collection('clientes').orderBy('nombre').onSnapshot(snap => {
+    todosClientes = snap.docs.map(d=>({id:d.id,...d.data()}));
+    verificarCumpleHoy();
+    renderClientes(todosClientes);
+    setSyncOk();
+  }, ()=>setSyncErr());
+}
+
+function verificarCumpleHoy(){
+  const hoy = new Date();
+  const diaHoy = String(hoy.getDate()).padStart(2,'0');
+  const mesHoy = String(hoy.getMonth()+1).padStart(2,'0');
+  const cumplehoy = todosClientes.filter(c=>{
+    if(!c.fecha) return false;
+    const partes = c.fecha.split('-');
+    return partes[1]===mesHoy && partes[2]===diaHoy;
+  });
+  const alerta = document.getElementById('cumple-alerta-hoy');
+  const nombres = document.getElementById('cumple-alerta-nombres');
+  if(cumplehoy.length > 0){
+    alerta.style.display='block';
+    nombres.innerHTML = cumplehoy.map(c=>
+      `<strong>${c.nombre}</strong> — ${c.consume||'cliente frecuente'} 🎉`
+    ).join('<br>');
+  } else {
+    alerta.style.display='none';
+  }
+}
+
+function diasParaCumple(fecha){
+  if(!fecha) return 999;
+  const hoy = new Date();
+  const partes = fecha.split('-');
+  let proxCumple = new Date(hoy.getFullYear(), parseInt(partes[1])-1, parseInt(partes[2]));
+  if(proxCumple < hoy) proxCumple.setFullYear(hoy.getFullYear()+1);
+  return Math.ceil((proxCumple - hoy) / (1000*60*60*24));
+}
+
+function formatFecha(fecha){
+  if(!fecha) return '';
+  const partes = fecha.split('-');
+  const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return partes[2]+' de '+meses[parseInt(partes[1])-1];
+}
+
+function renderClientes(lista){
+  const el = document.getElementById('clientes-lista');
+  if(!el) return;
+  if(lista.length===0){el.innerHTML='<p class="empty-msg">Sin clientes registrados aún</p>';return;}
+  const hoy = new Date();
+  const diaHoy = String(hoy.getDate()).padStart(2,'0');
+  const mesHoy = String(hoy.getMonth()+1).padStart(2,'0');
+  lista.sort((a,b)=>diasParaCumple(a.fecha)-diasParaCumple(b.fecha));
+  el.innerHTML = lista.map(c=>{
+    const dias = diasParaCumple(c.fecha);
+    const esHoy = dias===0;
+    const esPronto = dias>0 && dias<=7;
+    const wsp = c.telefono ? c.telefono.replace(/\D/g,'') : '';
+    const msgWsp = encodeURIComponent('Hola '+c.nombre+'! 🎂 Hoy es tu cumpleaños y desde Estación Alanna Café te deseamos un día muy especial. ¡Te esperamos para celebrar juntos! ☕🎉');
+    return `<div class="cli-card ${esHoy?'cumple-hoy':''}">
+      <div class="cli-top">
+        <span class="cli-nombre">${c.nombre}</span>
+        ${esHoy?'<span class="cli-badge-cumple">🎂 Hoy!</span>':esPronto?'<span class="cli-badge-pronto">en '+dias+' días</span>':''}
+      </div>
+      <div class="cli-info">
+        <span>📅 ${formatFecha(c.fecha)}</span>
+        ${c.telefono?'<span>📱 '+c.telefono+'</span>':''}
+      </div>
+      ${c.consume?'<div class="cli-consume">☕ Consume: '+c.consume+'</div>':''}
+      <div class="cli-actions">
+        ${wsp&&esHoy?`<a class="btn-wsp" href="https://wa.me/595${wsp}?text=${msgWsp}" target="_blank">💬 Saludar por WhatsApp</a>`:''}
+        <button class="btn-eliminar" onclick="eliminarCliente('${c.id}')">🗑 Eliminar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filtrarClientes(){
+  const q = document.getElementById('cli-buscar').value.toLowerCase();
+  const filtrados = todosClientes.filter(c=>c.nombre.toLowerCase().includes(q));
+  renderClientes(filtrados);
+}
+
+function agregarCliente(){
+  const nombre = document.getElementById('cli-nombre').value.trim();
+  const fecha = document.getElementById('cli-fecha').value;
+  const telefono = document.getElementById('cli-tel').value.trim();
+  const consume = document.getElementById('cli-consume').value.trim();
+  if(!nombre){alert('Escribí el nombre del cliente.');return;}
+  if(!fecha){alert('Seleccioná la fecha de cumpleaños.');return;}
+  db.collection('clientes').add({nombre,fecha,telefono,consume}).then(()=>{
+    document.getElementById('cli-nombre').value='';
+    document.getElementById('cli-fecha').value='';
+    document.getElementById('cli-tel').value='';
+    document.getElementById('cli-consume').value='';
+    setSyncOk();
+  }).catch(()=>setSyncErr());
+}
+
+function eliminarCliente(id){
+  if(!confirm('¿Eliminar este cliente?')) return;
+  db.collection('clientes').doc(id).delete().catch(()=>setSyncErr());
+}
 
 // EMPLEADOS
 const EMPLEADOS = [{id:'emp1', nombre:'Empleado 1'}, {id:'emp2', nombre:'Empleado 2'}];
