@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estación Alanna — Inspiración del día</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: #FAF6ED;
+    font-family: 'Lato', sans-serif;
+  }
+  .pantalla {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 28px;
+    text-align: center;
+    position: relative;
+  }
+  .marca-top {
+    position: absolute;
+    top: 28px;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: #BA7517;
+    text-transform: uppercase;
+  }
+  .decoracion {
+    width: 40px;
+    height: 2px;
+    background: #EF9F27;
+    margin: 0 auto 32px;
+  }
+  .comilla {
+    font-family: 'Playfair Display', serif;
+    font-size: 72px;
+    line-height: 0.4;
+    color: #EF9F27;
+    margin-bottom: 24px;
+    display: block;
+  }
+  .frase {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    line-height: 1.75;
+    color: #3B2A1A;
+    font-style: italic;
+    max-width: 340px;
+    margin: 0 auto;
+    transition: opacity 0.4s ease;
+  }
+  .autor-wrap {
+    margin-top: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    transition: opacity 0.4s ease;
+  }
+  .autor-linea {
+    width: 28px;
+    height: 1.5px;
+    background: #EF9F27;
+    margin-bottom: 10px;
+  }
+  .autor-nombre {
+    font-size: 13px;
+    font-weight: 700;
+    color: #BA7517;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  .autor-desc {
+    font-size: 11px;
+    color: #7A6050;
+    letter-spacing: 0.5px;
+  }
+  .btn-nueva {
+    margin-top: 44px;
+    padding: 13px 32px;
+    background: #3B2A1A;
+    color: #FAC775;
+    border: none;
+    border-radius: 50px;
+    font-family: 'Lato', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn-nueva:hover { background: #6B4A2A; }
+  .btn-nueva:active { transform: scale(0.97); }
+  .contador {
+    margin-top: 16px;
+    font-size: 11px;
+    color: #BA7517;
+    letter-spacing: 1px;
+  }
+  .marca-bottom {
+    position: absolute;
+    bottom: 24px;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #C0B090;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<div class="pantalla">
+
+  <div class="marca-top">Estación Alanna Café</div>
+
+  <div class="decoracion"></div>
+  <span class="comilla">"</span>
+
+  <div class="frase" id="frase-texto"></div>
+
+  <div class="autor-wrap" id="autor-wrap">
+    <div class="autor-linea"></div>
+    <div class="autor-nombre" id="autor-nombre"></div>
+    <div class="autor-desc" id="autor-desc"></div>
+  </div>
+
+  <button class="btn-nueva" onclick="nuevaFrase()">
+    ✦ Nueva frase
+  </button>
+
+  <div class="contador" id="contador"></div>
+
+  <div class="marca-bottom">Un alto en el camino para el alma</div>
+
+</div>
+
+<script>
+const FRASES = [
+  {texto:"Tu trabajo va a ocupar una gran parte de tu vida. La única forma de estar verdaderamente satisfecho es hacer lo que crees que es un gran trabajo.",autor:"Steve Jobs",desc:"Co-fundador de Apple"},
+  {texto:"La innovación distingue a un líder de un seguidor.",autor:"Steve Jobs",desc:"Co-fundador de Apple"},
+  {texto:"Las personas que están lo suficientemente locas como para pensar que pueden cambiar el mundo, son las que lo hacen.",autor:"Steve Jobs",desc:"Co-fundador de Apple"},
+  {texto:"El único modo de hacer un gran trabajo es amar lo que haces. Si todavía no lo has encontrado, sigue buscando.",autor:"Steve Jobs",desc:"Co-fundador de Apple"},
+  {texto:"La simplicidad es la máxima sofisticación.",autor:"Steve Jobs",desc:"Co-fundador de Apple"},
+  {texto:"En el medio de cada dificultad yace una oportunidad.",autor:"Albert Einstein",desc:"Premio Nobel de Física"},
+  {texto:"La imaginación es más importante que el conocimiento. El conocimiento es limitado, la imaginación rodea el mundo.",autor:"Albert Einstein",desc:"Premio Nobel de Física"},
+  {texto:"La vida es como andar en bicicleta. Para mantener el equilibrio, debes seguir moviéndote.",autor:"Albert Einstein",desc:"Premio Nobel de Física"},
+  {texto:"Sé el cambio que quieres ver en el mundo.",autor:"Mahatma Gandhi",desc:"Líder de la independencia india"},
+  {texto:"La felicidad es cuando lo que piensas, lo que dices y lo que haces están en armonía.",autor:"Mahatma Gandhi",desc:"Líder de la independencia india"},
+  {texto:"El éxito no es definitivo, el fracaso no es fatal. Lo que cuenta es el coraje de continuar.",autor:"Winston Churchill",desc:"Primer ministro del Reino Unido"},
+  {texto:"No cuentes los días, haz que los días cuenten.",autor:"Muhammad Ali",desc:"Campeón mundial de boxeo"},
+  {texto:"Cree que puedes y ya estás a mitad de camino.",autor:"Theodore Roosevelt",desc:"Presidente de los Estados Unidos"},
+  {texto:"La felicidad no es algo ya hecho. Viene de tus propias acciones.",autor:"Dalai Lama",desc:"Líder espiritual tibetano"},
+  {texto:"Nunca es tarde para ser lo que podrías haber sido.",autor:"George Eliot",desc:"Escritora británica"},
+  {texto:"Un pequeño paso para el hombre, un gran salto para la humanidad.",autor:"Neil Armstrong",desc:"Primer hombre en la Luna"},
+  {texto:"La vida es lo que pasa mientras estás ocupado haciendo otros planes.",autor:"John Lennon",desc:"Músico y activista"},
+  {texto:"Si tus sueños no te asustan, es que no son suficientemente grandes.",autor:"Ellen Johnson Sirleaf",desc:"Premio Nobel de la Paz"},
+  {texto:"No importa qué tan lento vayas, siempre y cuando no te detengas.",autor:"Confucio",desc:"Filósofo chino"},
+  {texto:"El secreto para salir adelante es empezar.",autor:"Mark Twain",desc:"Escritor estadounidense"},
+  {texto:"Primero resuelve el problema, luego escribe el código.",autor:"John Johnson",desc:"Ingeniero de software"},
+  {texto:"Todo lo que siempre quise fue cambiar el mundo.",autor:"Nelson Mandela",desc:"Premio Nobel de la Paz"},
+  {texto:"La educación es el arma más poderosa que puedes usar para cambiar el mundo.",autor:"Nelson Mandela",desc:"Premio Nobel de la Paz"},
+  {texto:"Cada mañana tenemos dos opciones: continuar durmiendo con nuestros sueños, o levantarnos y perseguirlos.",autor:"Kareem Abdul-Jabbar",desc:"Leyenda del baloncesto"},
+];
+
+let ultima = -1;
+let vistas = 0;
+
+function nuevaFrase() {
+  let idx;
+  do { idx = Math.floor(Math.random() * FRASES.length); } while (idx === ultima && FRASES.length > 1);
+  ultima = idx;
+  vistas++;
+
+  const elFrase = document.getElementById('frase-texto');
+  const elNombre = document.getElementById('autor-nombre');
+  const elDesc = document.getElementById('autor-desc');
+  const elContador = document.getElementById('contador');
+
+  elFrase.style.opacity = '0';
+  document.getElementById('autor-wrap').style.opacity = '0';
+
+  setTimeout(() => {
+    const f = FRASES[idx];
+    elFrase.textContent = f.texto;
+    elNombre.textContent = '— ' + f.autor;
+    elDesc.textContent = f.desc;
+    elContador.textContent = vistas > 1 ? vistas + ' frases leídas hoy' : '';
+    elFrase.style.opacity = '1';
+    document.getElementById('autor-wrap').style.opacity = '1';
+  }, 300);
+}
+
+nuevaFrase();
+</script>
+</body>
+</html>
