@@ -89,6 +89,17 @@ body{font-family:'Lato',sans-serif;background:#F4F0E8;min-height:100vh;}
 .stock-form input:focus{outline:none;border-color:#BA7517;}
 
 
+
+.prod-rank{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F0E8D4;}
+.prod-rank:last-child{border-bottom:none;}
+.prod-rank-pos{width:24px;height:24px;border-radius:50%;background:#3B2A1A;color:#FAC775;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.prod-rank-pos.gold{background:#EF9F27;color:#fff;}
+.prod-rank-nombre{flex:1;font-size:13px;color:#3B2A1A;font-weight:500;}
+.prod-rank-cant{font-size:12px;color:#3B6D11;font-weight:700;}
+.prod-rank-bar{height:6px;background:#EF9F27;border-radius:3px;margin-top:3px;}
+.variacion-pos{color:#3B6D11;}
+.variacion-neg{color:#A32D2D;}
+
 .cli-card{background:#fff;border:1px solid #E8DFC8;border-radius:10px;padding:12px 14px;margin-bottom:8px;}
 .cli-card.cumple-hoy{border:2px solid #EF9F27;background:#FFFDF7;}
 .cli-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
@@ -141,6 +152,7 @@ body{font-family:'Lato',sans-serif;background:#F4F0E8;min-height:100vh;}
   <button class="nav-tab" id="tab-stock" onclick="showVista('stock')">📦 Stock</button>
   <button class="nav-tab" id="tab-empleados" onclick="showVista('empleados')">👥 Turnos</button>
   <button class="nav-tab" id="tab-cumple" onclick="showVista('cumple')">🎂 Clientes</button>
+  <button class="nav-tab" id="tab-reporte" onclick="showVista('reporte')">📊 Reporte</button>
 </div>
 
 <div class="vista activa" id="v-mesas">
@@ -268,6 +280,37 @@ body{font-family:'Lato',sans-serif;background:#F4F0E8;min-height:100vh;}
 
 </div>
 
+
+<div class="vista" id="v-reporte">
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+    <div class="metric"><div class="metric-lbl">Esta semana</div><div class="metric-val" id="rep-total-semana">₲ 0</div></div>
+    <div class="metric"><div class="metric-lbl">Semana anterior</div><div class="metric-val" id="rep-total-anterior">₲ 0</div></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+    <div class="metric"><div class="metric-lbl">Ventas esta semana</div><div class="metric-val" id="rep-cant-semana">0</div></div>
+    <div class="metric"><div class="metric-lbl">Variación</div><div class="metric-val" id="rep-variacion" style="font-size:18px;">—</div></div>
+  </div>
+
+  <div class="panel" style="margin-bottom:10px;">
+    <div class="panel-title">Ventas por día — esta semana</div>
+    <canvas id="grafico-semana" height="160"></canvas>
+  </div>
+
+  <div class="panel" style="margin-bottom:10px;">
+    <div class="panel-title">Productos más vendidos</div>
+    <div id="rep-productos"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Comparación semanal</div>
+    <canvas id="grafico-comparacion" height="120"></canvas>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
@@ -302,14 +345,15 @@ setInterval(()=>{const d=new Date();document.getElementById('hora').textContent=
 document.getElementById('hora').textContent=new Date().toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'});
 
 function showVista(id){
-  ['mesas','pedido','ps','resumen','stock','empleados','cumple'].forEach(v=>document.getElementById('v-'+v).classList.remove('activa'));
-  ['mesas','resumen','stock','empleados','cumple'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.classList.remove('active');});
+  ['mesas','pedido','ps','resumen','stock','empleados','cumple','reporte'].forEach(v=>document.getElementById('v-'+v).classList.remove('activa'));
+  ['mesas','resumen','stock','empleados','cumple','reporte'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.classList.remove('active');});
   document.getElementById('v-'+id).classList.add('activa');
   const tab=document.getElementById('tab-'+id);if(tab)tab.classList.add('active');
   if(id==='resumen')escucharVentas();
   if(id==='stock')escucharStock();
   if(id==='empleados'){escucharEmpleados();renderEmpleados();}
   if(id==='cumple'){escucharClientes();}
+  if(id==='reporte'){cargarReporte();}
 }
 function volverMesas(){mesaActual=null;showVista('mesas');}
 
@@ -517,6 +561,167 @@ db.collection('playstation').doc('ps1').get().then(snap=>{
 }).catch(()=>setSyncErr());
 
 
+
+
+// REPORTE SEMANAL
+let graficoSemana = null;
+let graficoComparacion = null;
+
+function getLunesDeEstaSemana(){
+  const hoy = new Date();
+  const dia = hoy.getDay();
+  const diff = dia === 0 ? -6 : 1 - dia;
+  const lunes = new Date(hoy);
+  lunes.setDate(hoy.getDate() + diff);
+  lunes.setHours(0,0,0,0);
+  return lunes;
+}
+
+function formatFechaCorta(fecha){
+  const dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  return dias[fecha.getDay()];
+}
+
+function formatFechaES(fecha){
+  return fecha.toLocaleDateString('es-PY');
+}
+
+async function cargarReporte(){
+  const lunes = getLunesDeEstaSemana();
+  const lunesAnterior = new Date(lunes);
+  lunesAnterior.setDate(lunes.getDate() - 7);
+  const domingoAnterior = new Date(lunes);
+  domingoAnterior.setDate(lunes.getDate() - 1);
+  domingoAnterior.setHours(23,59,59,999);
+
+  // Obtener todas las ventas
+  const snap = await db.collection('ventas').get();
+  const todasVentas = snap.docs.map(d=>d.data());
+
+  // Separar por semana usando fecha
+  const ventasSemana = [];
+  const ventasAnterior = [];
+
+  todasVentas.forEach(v => {
+    if(!v.fecha) return;
+    const partes = v.fecha.split('/');
+    if(partes.length < 3) return;
+    const fechaVenta = new Date(parseInt(partes[2]), parseInt(partes[1])-1, parseInt(partes[0]));
+    if(fechaVenta >= lunes) ventasSemana.push(v);
+    else if(fechaVenta >= lunesAnterior && fechaVenta <= domingoAnterior) ventasAnterior.push(v);
+  });
+
+  // Totales
+  const totalSemana = ventasSemana.reduce((s,v)=>s+(v.total||0),0);
+  const totalAnterior = ventasAnterior.reduce((s,v)=>s+(v.total||0),0);
+  const cantSemana = ventasSemana.length;
+
+  document.getElementById('rep-total-semana').textContent = fGs(totalSemana);
+  document.getElementById('rep-total-anterior').textContent = fGs(totalAnterior);
+  document.getElementById('rep-cant-semana').textContent = cantSemana;
+
+  // Variación
+  const varEl = document.getElementById('rep-variacion');
+  if(totalAnterior > 0){
+    const pct = Math.round(((totalSemana - totalAnterior) / totalAnterior) * 100);
+    varEl.textContent = (pct >= 0 ? '▲ +' : '▼ ') + pct + '%';
+    varEl.className = 'metric-val ' + (pct >= 0 ? 'variacion-pos' : 'variacion-neg');
+  } else {
+    varEl.textContent = '— Sin datos';
+    varEl.style.fontSize = '14px';
+  }
+
+  // Ventas por día esta semana
+  const dias = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  const ventasPorDia = [0,0,0,0,0,0,0];
+  ventasSemana.forEach(v => {
+    if(!v.fecha) return;
+    const partes = v.fecha.split('/');
+    if(partes.length < 3) return;
+    const fechaVenta = new Date(parseInt(partes[2]), parseInt(partes[1])-1, parseInt(partes[0]));
+    let idx = fechaVenta.getDay() - 1;
+    if(idx < 0) idx = 6;
+    ventasPorDia[idx] += (v.total||0);
+  });
+
+  // Gráfico días
+  const ctx1 = document.getElementById('grafico-semana').getContext('2d');
+  if(graficoSemana) graficoSemana.destroy();
+  graficoSemana = new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: dias,
+      datasets: [{
+        label: 'Ventas (₲)',
+        data: ventasPorDia,
+        backgroundColor: ventasPorDia.map(v => v > 0 ? '#EF9F27' : '#F0E8D4'),
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { callback: v => '₲'+v.toLocaleString('es-PY'), font:{size:10} }, grid:{color:'#F0E8D4'} },
+        x: { ticks: { font:{size:11} }, grid:{display:false} }
+      }
+    }
+  });
+
+  // Productos más vendidos
+  const conteo = {};
+  ventasSemana.forEach(v => {
+    if(!v.detalle) return;
+    v.detalle.split(', ').forEach(item => {
+      const match = item.match(/^(.+?)(?:\s+x(\d+))?$/);
+      if(match){
+        const nombre = match[1].trim();
+        const qty = parseInt(match[2]||'1');
+        conteo[nombre] = (conteo[nombre]||0) + qty;
+      }
+    });
+  });
+  const ranking = Object.entries(conteo).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const maxVal = ranking.length > 0 ? ranking[0][1] : 1;
+  const repProd = document.getElementById('rep-productos');
+  repProd.innerHTML = ranking.length === 0 ?
+    '<p class="empty-msg">Sin ventas esta semana aún</p>' :
+    ranking.map(([nombre,cant],i) => `
+      <div class="prod-rank">
+        <div class="prod-rank-pos ${i===0?'gold':''}">${i+1}</div>
+        <div style="flex:1;">
+          <div style="display:flex;justify-content:space-between;">
+            <span class="prod-rank-nombre">${nombre}</span>
+            <span class="prod-rank-cant">${cant} venta${cant>1?'s':''}</span>
+          </div>
+          <div class="prod-rank-bar" style="width:${Math.round((cant/maxVal)*100)}%"></div>
+        </div>
+      </div>`).join('');
+
+  // Gráfico comparación semanas
+  const ctx2 = document.getElementById('grafico-comparacion').getContext('2d');
+  if(graficoComparacion) graficoComparacion.destroy();
+  graficoComparacion = new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels: ['Semana anterior', 'Esta semana'],
+      datasets: [{
+        data: [totalAnterior, totalSemana],
+        backgroundColor: ['#F0E8D4','#EF9F27'],
+        borderRadius: 8,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { callback: v => '₲'+v.toLocaleString('es-PY'), font:{size:10} }, grid:{color:'#F0E8D4'} },
+        x: { ticks: { font:{size:12} }, grid:{display:false} }
+      }
+    }
+  });
+  setSyncOk();
+}
 
 // CLIENTES Y CUMPLEAÑOS
 let todosClientes = [];
