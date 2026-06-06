@@ -695,12 +695,23 @@ function escucharReservas(){
   reservasEscuchando = true;
   const hoy = new Date().toISOString().split('T')[0];
   document.getElementById('res-filtro-fecha').value = hoy;
-  db.collection('reservas').orderBy('fecha').orderBy('hora').onSnapshot(snap=>{
+  console.log('[Reservas] Iniciando escucha de Firebase...');
+  db.collection('reservas').onSnapshot(snap=>{
     todasReservas = snap.docs.map(d=>({id:d.id,...d.data()}));
+    console.log('[Reservas] Recibidas '+todasReservas.length+' reservas:', todasReservas);
+    // Ordenar manualmente por fecha y hora
+    todasReservas.sort((a,b)=>{
+      const fa = normalizarFecha(a.fecha), fb = normalizarFecha(b.fecha);
+      if(fa !== fb) return fa.localeCompare(fb);
+      return (a.hora||'').localeCompare(b.hora||'');
+    });
     actualizarMetricas();
     filtrarReservas();
     setSyncOk();
-  }, ()=>setSyncErr());
+  }, err=>{
+    console.error('[Reservas] ERROR:', err);
+    setSyncErr();
+  });
 }
 
 function actualizarMetricas(){
