@@ -190,6 +190,7 @@ body{font-family:'Lato',sans-serif;background:#F4F0E8;min-height:100vh;}
   <button class="nav-tab" id="tab-cumple" onclick="showVista('cumple')">🎂 Clientes</button>
   <button class="nav-tab" id="tab-reporte" onclick="showVista('reporte')">📊 Reporte</button>
   <button class="nav-tab" id="tab-torneo" onclick="showVista('torneo')">🏆 Torneo</button>
+  <button class="nav-tab" id="tab-reservas" onclick="showVista('reservas')">🗓️ Reservas</button>
 </div>
 
 <div class="vista activa" id="v-mesas">
@@ -404,6 +405,31 @@ body{font-family:'Lato',sans-serif;background:#F4F0E8;min-height:100vh;}
 
 </div>
 
+
+<div class="vista" id="v-reservas">
+
+  <!-- Métricas -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
+    <div class="metric"><div class="metric-lbl">Hoy</div><div class="metric-val" id="res-cant-hoy" style="font-size:20px;">0</div></div>
+    <div class="metric"><div class="metric-lbl">Pendientes</div><div class="metric-val" id="res-cant-pend" style="font-size:20px;color:#EF9F27;">0</div></div>
+    <div class="metric"><div class="metric-lbl">Confirmadas</div><div class="metric-val" id="res-cant-conf" style="font-size:20px;color:#3B6D11;">0</div></div>
+  </div>
+
+  <!-- Filtro fecha -->
+  <div style="background:#fff;border:1px solid #E8DFC8;border-radius:10px;padding:10px 12px;margin-bottom:10px;display:flex;align-items:center;gap:10px;">
+    <span style="font-size:12px;color:#7A6050;font-weight:700;">Ver fecha:</span>
+    <input type="date" id="res-filtro-fecha" onchange="filtrarReservas()" style="flex:1;padding:6px 10px;border:1px solid #E8DFC8;border-radius:8px;font-size:13px;background:#FAF6ED;font-family:'Lato',sans-serif;">
+    <button onclick="verHoy()" style="padding:6px 12px;background:#3B2A1A;color:#FAC775;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">Hoy</button>
+  </div>
+
+  <!-- Lista reservas -->
+  <div class="panel">
+    <div class="panel-title">Reservas del día</div>
+    <div id="reservas-lista"><p class="empty-msg">Sin reservas para esta fecha</p></div>
+  </div>
+
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
@@ -438,8 +464,8 @@ setInterval(()=>{const d=new Date();document.getElementById('hora').textContent=
 document.getElementById('hora').textContent=new Date().toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'});
 
 function showVista(id){
-  ['mesas','pedido','ps','resumen','stock','empleados','cumple','reporte','torneo'].forEach(v=>document.getElementById('v-'+v).classList.remove('activa'));
-  ['mesas','resumen','stock','empleados','cumple','reporte','torneo'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.classList.remove('active');});
+  ['mesas','pedido','ps','resumen','stock','empleados','cumple','reporte','torneo','reservas'].forEach(v=>document.getElementById('v-'+v).classList.remove('activa'));
+  ['mesas','resumen','stock','empleados','cumple','reporte','torneo','reservas'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.classList.remove('active');});
   document.getElementById('v-'+id).classList.add('activa');
   const tab=document.getElementById('tab-'+id);if(tab)tab.classList.add('active');
   if(id==='resumen')escucharVentas();
@@ -448,6 +474,7 @@ function showVista(id){
   if(id==='cumple'){escucharClientes();}
   if(id==='reporte'){cargarReporte();}
   if(id==='torneo'){escucharTorneo();}
+  if(id==='reservas'){escucharReservas();}
 }
 function volverMesas(){mesaActual=null;showVista('mesas');}
 
@@ -657,6 +684,77 @@ db.collection('playstation').doc('ps1').get().then(snap=>{
 
 
 
+
+
+// RESERVAS
+let reservasEscuchando = false;
+let todasReservas = [];
+
+function escucharReservas(){
+  if(reservasEscuchando) return;
+  reservasEscuchando = true;
+  const hoy = new Date().toISOString().split('T')[0];
+  document.getElementById('res-filtro-fecha').value = hoy;
+  db.collection('reservas').orderBy('fecha').orderBy('hora').onSnapshot(snap=>{
+    todasReservas = snap.docs.map(d=>({id:d.id,...d.data()}));
+    actualizarMetricas();
+    filtrarReservas();
+    setSyncOk();
+  }, ()=>setSyncErr());
+}
+
+function actualizarMetricas(){
+  const hoy = new Date().toISOString().split('T')[0];
+  const deHoy = todasReservas.filter(r=>r.fecha===hoy);
+  document.getElementById('res-cant-hoy').textContent = deHoy.length;
+  document.getElementById('res-cant-pend').textContent = deHoy.filter(r=>r.estado==='pendiente').length;
+  document.getElementById('res-cant-conf').textContent = deHoy.filter(r=>r.estado==='confirmada').length;
+}
+
+function verHoy(){
+  const hoy = new Date().toISOString().split('T')[0];
+  document.getElementById('res-filtro-fecha').value = hoy;
+  filtrarReservas();
+}
+
+function filtrarReservas(){
+  const fecha = document.getElementById('res-filtro-fecha').value;
+  const filtradas = todasReservas.filter(r=>r.fecha===fecha)
+    .sort((a,b)=>a.hora.localeCompare(b.hora));
+  renderReservas(filtradas);
+}
+
+function renderReservas(lista){
+  const el = document.getElementById('reservas-lista');
+  if(!el) return;
+  if(lista.length===0){el.innerHTML='<p class="empty-msg">Sin reservas para esta fecha</p>';return;}
+  el.innerHTML = lista.map(r=>{
+    const tel = (r.tel||'').replace(/\D/g,'');
+    const msg = encodeURIComponent('Hola '+r.nombre+'! Te confirmamos tu reserva en Estación Alanna Café para el '+r.fecha+' a las '+r.hora+'. ¡Te esperamos! ☕');
+    return `<div class="res-card ${r.estado||'pendiente'}">
+      <div class="res-top">
+        <span class="res-nombre">${r.tipo==='ps'?'🎮':'🪑'} ${r.nombre}</span>
+        <span class="res-estado ${r.estado||'pendiente'}">${r.estado||'pendiente'}</span>
+      </div>
+      <div class="res-info">
+        📍 ${r.lugar} &nbsp;·&nbsp; 🕐 ${r.hora} &nbsp;·&nbsp; 👥 ${r.personas} persona${r.personas>1?'s':''}
+        ${r.tel?'<br>📱 '+r.tel:''}
+      </div>
+      ${r.comentario?'<div class="res-comentario">💬 '+r.comentario+'</div>':''}
+      <div class="res-actions">
+        ${r.estado==='pendiente'?`<button class="btn-confirmar" onclick="cambiarEstadoRes('${r.id}','confirmada')">✓ Confirmar</button>`:''}
+        ${r.estado!=='cancelada'?`<button class="btn-cancelar-res" onclick="cambiarEstadoRes('${r.id}','cancelada')">✗ Cancelar</button>`:''}
+        ${tel?`<a class="btn-wsp-res" href="https://wa.me/595${tel}?text=${msg}" target="_blank">💬 WhatsApp</a>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function cambiarEstadoRes(id, estado){
+  const accion = estado==='confirmada'?'confirmar':'cancelar';
+  if(!confirm('¿'+accion.charAt(0).toUpperCase()+accion.slice(1)+' esta reserva?'))return;
+  db.collection('reservas').doc(id).update({estado}).catch(()=>setSyncErr());
+}
 
 // TORNEO
 let torneoData = {jugadores:[], grupos:[], llaves:[], ganador:null, estado:'inscripcion'};
