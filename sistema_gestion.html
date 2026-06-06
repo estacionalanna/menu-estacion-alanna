@@ -705,7 +705,7 @@ function escucharReservas(){
 
 function actualizarMetricas(){
   const hoy = new Date().toISOString().split('T')[0];
-  const deHoy = todasReservas.filter(r=>r.fecha===hoy);
+  const deHoy = todasReservas.filter(r=>normalizarFecha(r.fecha)===hoy);
   document.getElementById('res-cant-hoy').textContent = deHoy.length;
   document.getElementById('res-cant-pend').textContent = deHoy.filter(r=>r.estado==='pendiente').length;
   document.getElementById('res-cant-conf').textContent = deHoy.filter(r=>r.estado==='confirmada').length;
@@ -717,9 +717,22 @@ function verHoy(){
   filtrarReservas();
 }
 
+function normalizarFecha(f){
+  if(!f) return '';
+  // Si viene como YYYY-MM-DD lo devuelve igual
+  if(/^\d{4}-\d{2}-\d{2}$/.test(f)) return f;
+  // Si viene como D/M/YYYY o DD/MM/YYYY lo convierte
+  const p = f.split('/');
+  if(p.length===3){
+    const anio = p[2].length===4?p[2]:'20'+p[2];
+    return anio+'-'+String(p[1]).padStart(2,'0')+'-'+String(p[0]).padStart(2,'0');
+  }
+  return f;
+}
+
 function filtrarReservas(){
   const fecha = document.getElementById('res-filtro-fecha').value;
-  const filtradas = todasReservas.filter(r=>r.fecha===fecha)
+  const filtradas = todasReservas.filter(r=>normalizarFecha(r.fecha)===fecha)
     .sort((a,b)=>a.hora.localeCompare(b.hora));
   renderReservas(filtradas);
 }
@@ -754,6 +767,13 @@ function cambiarEstadoRes(id, estado){
   const accion = estado==='confirmada'?'confirmar':'cancelar';
   if(!confirm('¿'+accion.charAt(0).toUpperCase()+accion.slice(1)+' esta reserva?'))return;
   db.collection('reservas').doc(id).update({estado}).catch(()=>setSyncErr());
+}
+
+function liberarReserva(id, lugar){
+  if(!confirm('¿Marcar como completada y liberar '+lugar+'?\nEsto indica que el cliente ya terminó su visita.'))return;
+  db.collection('reservas').doc(id).update({estado:'completada', horaLibeacion: new Date().toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'})})
+    .then(()=>setSyncOk())
+    .catch(()=>setSyncErr());
 }
 
 // TORNEO
