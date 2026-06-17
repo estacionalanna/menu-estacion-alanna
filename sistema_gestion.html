@@ -195,6 +195,20 @@ body{font-family:'Lato',sans-serif;background:#F4F0E8;min-height:100vh;}
 .hist-hora{color:var(--texto-suave);}
 
 .btn-add-stock{padding:8px 14px;background:var(--cafe);color:var(--miel-claro);border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+/* ── HISTORIAL DÍAS ── */
+.dia-card{background:#fff;border:1px solid #E8DFC8;border-radius:12px;margin-bottom:8px;overflow:hidden;}
+.dia-header{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;cursor:pointer;gap:8px;}
+.dia-fecha{font-size:13px;font-weight:700;color:var(--cafe);}
+.dia-total{font-size:15px;font-weight:700;color:var(--cana);}
+.dia-meta{font-size:11px;color:var(--texto-suave);}
+.dia-chevron{font-size:12px;color:var(--suave);transition:transform .2s;}
+.dia-chevron.abierto{transform:rotate(180deg);}
+.dia-detalle{display:none;border-top:1px solid #F0E8D4;padding:8px 14px;}
+.dia-detalle.show{display:block;}
+.dia-venta-row{display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;border-bottom:1px solid #F0E8D4;font-size:12px;}
+.dia-venta-row:last-child{border-bottom:none;}
+.dia-metodos{display:flex;gap:6px;flex-wrap:wrap;padding:8px 0 4px;}
+.dia-metodo-chip{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#F0E8D4;color:var(--suave);}
 
 /* Badge origen inscripción */
 .badge-online{background:#E8F4FD;color:#1565C0;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:0.5px;}
@@ -337,15 +351,22 @@ body{font-family:'Lato',sans-serif;background:#F4F0E8;min-height:100vh;}
 </div>
 
 <div class="vista" id="v-resumen">
+  <!-- Métricas del día -->
   <div class="metric-grid">
     <div class="metric"><div class="metric-lbl">Total del día</div><div class="metric-val" id="total-dia">₲ 0</div></div>
     <div class="metric"><div class="metric-lbl">Ventas</div><div class="metric-val" id="cant-ventas">0</div></div>
   </div>
-  <div class="panel">
+  <!-- Historial de hoy -->
+  <div class="panel" style="margin-bottom:10px;">
     <div class="panel-title">Historial de hoy</div>
     <div id="historial-lista"><p class="empty-msg">Sin ventas aún</p></div>
   </div>
   <button class="btn-cerrar" onclick="cerrarCaja()">🔒 Cerrar caja del día</button>
+  <!-- Historial de días anteriores -->
+  <div class="panel" style="margin-top:10px;">
+    <div class="panel-title">Historial de días anteriores</div>
+    <div id="historial-dias"><p class="empty-msg">Sin cierres registrados aún</p></div>
+  </div>
 </div>
 
 <div class="vista" id="v-stock">
@@ -694,7 +715,7 @@ function showVista(id){
   ['mesas','resumen','stock','empleados','cumple','reporte','torneo','reservas','eventos'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.classList.remove('active');});
   document.getElementById('v-'+id).classList.add('activa');
   const tab=document.getElementById('tab-'+id);if(tab)tab.classList.add('active');
-  if(id==='resumen')escucharVentas();
+  if(id==='resumen'){escucharVentas();escucharHistorialCaja();}
   if(id==='stock')escucharStock();
   if(id==='empleados'){escucharEmpleados();renderEmpleados();}
   if(id==='cumple'){escucharClientes();}
@@ -869,8 +890,93 @@ function escucharVentas(){
     setSyncOk();},()=>setSyncErr());
 }
 function cerrarCaja(){
-  if(!confirm('¿Cerrar caja del día?'))return;
-  db.collection('ventas').get().then(snap=>{const batch=db.batch();snap.docs.forEach(d=>batch.delete(d.ref));return batch.commit();}).then(()=>setSyncOk()).catch(()=>setSyncErr());
+  if(!confirm('¿Cerrar caja del día? Se guardará un resumen y se limpiará el historial.'))return;
+  db.collection('ventas').get().then(snap=>{
+    const ventas = snap.docs.map(d=>d.data());
+    if(ventas.length === 0){ alert('No hay ventas para cerrar.'); return; }
+
+    // Calcular resumen
+    const total = ventas.reduce((s,v)=>s+(v.total||0),0);
+    const fecha = new Date().toLocaleDateString('es-PY');
+    const fechaISO = new Date().toISOString().split('T')[0];
+
+    // Resumen por método de pago
+    const porMetodo = {};
+    ventas.forEach(v=>{
+      const m = v.metodoPago || 'Sin especificar';
+      if(!porMetodo[m]) porMetodo[m] = 0;
+      porMetodo[m] += (v.total||0);
+    });
+
+    // Guardar resumen del día en historial_caja
+    db.collection('historial_caja').add({
+      fecha, fechaISO,
+      total, cantVentas: ventas.length,
+      porMetodo,
+      ventas: ventas.map(v=>({hora:v.hora,mesa:v.mesa||'',detalle:v.detalle||'',total:v.total||0,metodoPago:v.metodoPago||'Sin especificar'})),
+      creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(()=>{
+      // Borrar ventas del día
+      const batch = db.batch();
+      snap.docs.forEach(d=>batch.delete(d.ref));
+      return batch.commit();
+    }).then(()=>{
+      setSyncOk();
+      escucharHistorialCaja();
+    }).catch(()=>setSyncErr());
+  }).catch(()=>setSyncErr());
+}
+
+// ── HISTORIAL DE DÍAS ANTERIORES ──
+let historialEscuchando = false;
+
+function escucharHistorialCaja(){
+  if(historialEscuchando) return;
+  historialEscuchando = true;
+  db.collection('historial_caja').orderBy('fechaISO','desc').limit(30).onSnapshot(snap=>{
+    const dias = snap.docs.map(d=>({id:d.id,...d.data()}));
+    const el = document.getElementById('historial-dias');
+    if(!el) return;
+    if(dias.length === 0){
+      el.innerHTML='<p class="empty-msg">Sin cierres registrados aún</p>';
+      return;
+    }
+    el.innerHTML = dias.map((dia,i)=>{
+      const metIconos = {'Efectivo':'💵','QR/Bancard':'📱','Tarjeta':'💳','Transferencia':'🏦','Sin especificar':'❓'};
+      const chipsHTML = Object.entries(dia.porMetodo||{})
+        .map(([m,t])=>`<span class="dia-metodo-chip">${metIconos[m]||'💰'} ${m}: ${fGs(t)}</span>`).join('');
+      const ventasHTML = (dia.ventas||[]).map(v=>`
+        <div class="dia-venta-row">
+          <span style="color:var(--suave);min-width:42px;">${v.hora}</span>
+          <span style="flex:1;margin:0 8px;color:var(--cafe);">${v.mesa} — ${v.detalle}</span>
+          <span style="color:var(--cana);font-weight:700;">${fGs(v.total)}</span>
+        </div>`).join('');
+      return `<div class="dia-card">
+        <div class="dia-header" onclick="toggleDia('dia-${i}',this)">
+          <div>
+            <div class="dia-fecha">📅 ${dia.fecha}</div>
+            <div class="dia-meta">${dia.cantVentas} venta${dia.cantVentas!==1?'s':''}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="dia-total">${fGs(dia.total)}</div>
+            <span class="dia-chevron" id="chev-dia-${i}">▼</span>
+          </div>
+        </div>
+        <div class="dia-detalle" id="dia-${i}">
+          <div class="dia-metodos">${chipsHTML||'<span class="dia-metodo-chip">Sin datos de método</span>'}</div>
+          ${ventasHTML}
+        </div>
+      </div>`;
+    }).join('');
+    setSyncOk();
+  }, ()=>setSyncErr());
+}
+
+function toggleDia(id, header){
+  const det = document.getElementById(id);
+  const chev = header.querySelector('.dia-chevron');
+  const abierto = det.classList.toggle('show');
+  if(chev) chev.classList.toggle('abierto', abierto);
 }
 
 let stockEscuchando=false;
