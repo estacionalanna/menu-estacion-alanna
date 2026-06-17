@@ -16,6 +16,9 @@ body{font-family:'Lato',sans-serif;background:#F4F0E8;min-height:100vh;}
 .topbar-hora{font-size:12px;color:#BA7517;}
 .sync-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;}
 .sync-dot.ok{background:#3B6D11;}.sync-dot.err{background:var(--rojo);}
+.stock-alerta-badge{display:none;align-items:center;gap:4px;background:var(--rojo);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;cursor:pointer;animation:pulso 1.5s infinite;}
+.stock-alerta-badge.show{display:flex;}
+@keyframes pulso{0%,100%{opacity:1;}50%{opacity:.6;}}
 .nav-tabs{display:grid;grid-template-columns:repeat(5,1fr);background:#2C1F0F;}
 .nav-tab{padding:10px 4px;background:none;border:none;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#BA7517;border-bottom:3px solid transparent;border-right:1px solid #1A1208;}
 .nav-tab:nth-child(5n){border-right:none;}
@@ -242,6 +245,7 @@ body{font-family:'Lato',sans-serif;background:#F4F0E8;min-height:100vh;}
   <div style="display:flex;align-items:center;gap:8px;">
     <span class="topbar-hora" id="hora"></span>
     <span class="sync-dot" id="sync-dot"></span>
+    <span class="stock-alerta-badge" id="stock-alerta-badge" onclick="showVista('stock')" title="Productos con stock bajo">⚠ <span id="stock-alerta-cant">0</span> bajo stock</span>
   </div>
 </div>
 <div class="nav-tabs">
@@ -834,10 +838,25 @@ function cerrarCaja(){
 }
 
 let stockEscuchando=false;
+function actualizarBadgeStock(items){
+  const bajos = items.filter(it=>it.cantidad<=3);
+  const badge = document.getElementById('stock-alerta-badge');
+  const cant  = document.getElementById('stock-alerta-cant');
+  if(bajos.length > 0){
+    badge.classList.add('show');
+    cant.textContent = bajos.length;
+    badge.title = 'Stock bajo: ' + bajos.map(it=>it.nombre+'('+it.cantidad+')').join(', ');
+  } else {
+    badge.classList.remove('show');
+  }
+}
+
 function escucharStock(){
   if(stockEscuchando)return;stockEscuchando=true;
   db.collection('stock').orderBy('nombre').onSnapshot(snap=>{
     const items=snap.docs.map(d=>({id:d.id,...d.data()}));
+    // Actualizar badge en topbar siempre, aunque no esté en la vista stock
+    actualizarBadgeStock(items);
     const el=document.getElementById('stock-lista');
     el.innerHTML=items.length===0?'<p class="empty-msg">Sin productos. Agregá uno arriba.</p>':
       items.map(it=>`<div class="stock-item">
@@ -1815,6 +1834,7 @@ document.getElementById('modal-pago').addEventListener('click', function(e) {
 });
 
 escucharMesas();
+escucharStock(); // arrancar stock al inicio para badge en topbar
 </script>
 </body>
 </html>
